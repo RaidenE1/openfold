@@ -64,11 +64,18 @@ class MSATransition(nn.Module):
         self.linear_1 = Linear(self.c_m, self.n * self.c_m, init="relu")
         self.relu = nn.ReLU()
         self.linear_2 = Linear(self.n * self.c_m, self.c_m, init="final")
+        
+        # use fake qantization
+        self.quant = torch.quantization.QuantStub()
+        self.dequant = torch.quantization.DeQuantStub()
 
     def _transition(self, m, mask):
+        m = m.quant(m)
         m = self.linear_1(m)
         m = self.relu(m)
-        m = self.linear_2(m) * mask
+        m = self.linear_2(m)
+        m = self.dequant(m)
+        m = m * mask
         return m
 
     @torch.jit.ignore

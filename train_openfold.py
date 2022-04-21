@@ -52,7 +52,13 @@ class OpenFoldWrapper(pl.LightningModule):
     def __init__(self, config):
         super(OpenFoldWrapper, self).__init__()
         self.config = config
-        self.model = AlphaFold(config)
+        
+        # activate quantization
+        model_fp32 = AlphaFold(config)
+        model_fp32.train()
+        model_fp32.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
+        self.model = torch.quantization.prepare_qat(model_fp32)
+        
         self.loss = AlphaFoldLoss(config.loss)
         self.ema = ExponentialMovingAverage(
             model=self.model, decay=config.ema.decay

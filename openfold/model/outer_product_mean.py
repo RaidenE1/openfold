@@ -49,6 +49,10 @@ class OuterProductMean(nn.Module):
         self.linear_1 = Linear(c_m, c_hidden)
         self.linear_2 = Linear(c_m, c_hidden)
         self.linear_out = Linear(c_hidden ** 2, c_z, init="final")
+        
+        # use fake qantization
+        self.quant = torch.quantization.QuantStub()
+        self.dequant = torch.quantization.DeQuantStub()
 
     def _opm(self, a, b):
         # [*, N_res, N_res, C, C]
@@ -58,7 +62,9 @@ class OuterProductMean(nn.Module):
         outer = outer.reshape(outer.shape[:-2] + (-1,))
 
         # [*, N_res, N_res, C_z]
+        outer = self.quant(outer)
         outer = self.linear_out(outer)
+        outer = self.dequant(outer)
 
         return outer
 
@@ -109,8 +115,13 @@ class OuterProductMean(nn.Module):
 
         # [*, N_seq, N_res, C]
         mask = mask.unsqueeze(-1)
-        a = self.linear_1(m) * mask
-        b = self.linear_2(m) * mask
+        m = self.quant(m)
+        m = self.linear_1(m)
+        m_1 = self.linear_2(m)
+        m = self.dequant(m)
+        m_1 = self.dequant(m_1)
+        a = m * mask
+        b = m_1 * mask
 
         a = a.transpose(-2, -3)
         b = b.transpose(-2, -3)
